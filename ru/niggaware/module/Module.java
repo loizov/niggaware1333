@@ -1,21 +1,33 @@
 package ru.niggaware.module;
 
-public abstract class Module {
+import net.minecraft.client.Minecraft;
+
+public class Module {
+    protected final Minecraft mc = Minecraft.getInstance();
     
-    private String name;
-    private int keyCode;
-    private Category category;
+    private final String name;
+    private final Category category;
     private boolean enabled;
+    private int key;
     
-    public Module(String name, int keyCode, Category category) {
+    public Module(String name, Category category) {
         this.name = name;
-        this.keyCode = keyCode;
         this.category = category;
         this.enabled = false;
+        this.key = 0;
     }
     
     public void toggle() {
-        enabled = !enabled;
+        setEnabled(!enabled);
+    }
+    
+    public void setEnabled(boolean enabled) {
+        if (this.enabled == enabled) {
+            return;
+        }
+        
+        this.enabled = enabled;
+        
         if (enabled) {
             onEnable();
         } else {
@@ -24,21 +36,11 @@ public abstract class Module {
     }
     
     public void onEnable() {}
-    public void onDisable() {}
-    public void onUpdate() {}
-    public void onRender() {}
     
-    // Getters and Setters
+    public void onDisable() {}
+    
     public String getName() {
         return name;
-    }
-    
-    public int getKeyCode() {
-        return keyCode;
-    }
-    
-    public void setKeyCode(int keyCode) {
-        this.keyCode = keyCode;
     }
     
     public Category getCategory() {
@@ -49,11 +51,18 @@ public abstract class Module {
         return enabled;
     }
     
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+    public int getKey() {
+        return key;
+    }
+    
+    public void setKey(int key) {
+        this.key = key;
     }
     
     public enum Category {
-        COMBAT, MOVEMENT, PLAYER, RENDER, MISC
+        COMBAT,
+        MOVEMENT,
+        RENDER,
+        MISC
     }
 }

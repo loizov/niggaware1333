@@ -1,69 +1,69 @@
 package ru.niggaware;
 
+import com.google.gson.*;
 import ru.niggaware.module.Module;
+import net.minecraft.client.Minecraft;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.file.Files;
 
 public class ConfigManager {
-    
-    private File configFile;
-    private File configDir;
+    private final File configFile;
+    private final Gson gson;
     
     public ConfigManager() {
-        configDir = new File("niggaware");
-        configFile = new File(configDir, "config.txt");
-        
-        if (!configDir.exists()) {
-            configDir.mkdir();
+        File dir = new File(Minecraft.getInstance().gameDir, "NiggaWare");
+        if (!dir.exists()) {
+            dir.mkdir();
         }
+        
+        this.configFile = new File(dir, "config.json");
+        this.gson = new GsonBuilder().setPrettyPrinting().create();
     }
     
     public void save() {
         try {
-            if (!configFile.exists()) {
-                configFile.createNewFile();
+            JsonObject json = new JsonObject();
+            
+            for (Module module : NiggaWare.INSTANCE.moduleManager.getModules()) {
+                JsonObject moduleJson = new JsonObject();
+                moduleJson.addProperty("enabled", module.isEnabled());
+                moduleJson.addProperty("key", module.getKey());
+                
+                json.add(module.getName(), moduleJson);
             }
             
-            PrintWriter writer = new PrintWriter(new FileWriter(configFile));
-            
-            for (Module module : NiggaWare.getInstance().getModuleManager().getModules()) {
-                writer.println(module.getName() + ":" + module.isEnabled() + ":" + module.getKeyCode());
-            }
-            
+            FileWriter writer = new FileWriter(configFile);
+            writer.write(gson.toJson(json));
             writer.close();
-            System.out.println("Config saved!");
-            
-        } catch (Exception e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
     
     public void load() {
+        if (!configFile.exists()) {
+            return;
+        }
+        
         try {
-            if (!configFile.exists()) {
-                return;
-            }
+            String content = new String(Files.readAllBytes(configFile.toPath()));
+            JsonObject json = JsonParser.parseString(content).getAsJsonObject();
             
-            BufferedReader reader = new BufferedReader(new FileReader(configFile));
-            String line;
-            
-            while ((line = reader.readLine()) != null) {
-                String[] split = line.split(":");
-                if (split.length >= 3) {
-                    Module module = NiggaWare.getInstance().getModuleManager().getModule(split[0]);
-                    if (module != null) {
-                        module.setEnabled(Boolean.parseBoolean(split[1]));
-                        module.setKeyCode(Integer.parseInt(split[2]));
+            for (Module module : NiggaWare.INSTANCE.moduleManager.getModules()) {
+                if (json.has(module.getName())) {
+                    JsonObject moduleJson = json.getAsJsonObject(module.getName());
+                    
+                    if (moduleJson.has("enabled") && moduleJson.get("enabled").getAsBoolean()) {
+                        module.toggle();
+                    }
+                    
+                    if (moduleJson.has("key")) {
+                        module.setKey(moduleJson.get("key").getAsInt());
                     }
                 }
             }
-            
-            reader.close();
-            System.out.println("Config loaded!");
-            
-        } catch (Exception e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }

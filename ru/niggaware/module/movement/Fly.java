@@ -1,33 +1,46 @@
 package ru.niggaware.module.movement;
 
+import ru.niggaware.NiggaWare;
+import ru.niggaware.EventTarget;
 import ru.niggaware.module.Module;
-import net.minecraft.client.Minecraft;
+import ru.niggaware.UpdateEvent;
 import org.lwjgl.glfw.GLFW;
 
 public class Fly extends Module {
-    
-    private double flySpeed = 0.5;
+    private float speed = 0.5F;
     
     public Fly() {
-        super("Fly", GLFW.GLFW_KEY_F, Category.MOVEMENT);
+        super("Fly", Category.MOVEMENT);
+        setKey(GLFW.GLFW_KEY_F);
     }
     
     @Override
-    public void onUpdate() {
-        Minecraft mc = Minecraft.getInstance();
+    public void onEnable() {
+        NiggaWare.INSTANCE.eventManager.register(this);
+        
         if (mc.player != null) {
-            mc.player.abilities.flying = true;
-            mc.player.abilities.mayfly = true;
-            mc.player.abilities.setFlyingSpeed((float) flySpeed / 10);
+            mc.player.abilities.allowFlying = true;
+            mc.player.abilities.isFlying = true;
         }
     }
     
     @Override
     public void onDisable() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null && !mc.player.isCreative()) {
-            mc.player.abilities.flying = false;
-            mc.player.abilities.mayfly = false;
+        NiggaWare.INSTANCE.eventManager.unregister(this);
+        
+        if (mc.player != null) {
+            mc.player.abilities.allowFlying = false;
+            mc.player.abilities.isFlying = false;
         }
+    }
+    
+    @EventTarget
+    public void onUpdate(UpdateEvent event) {
+        if (mc.player == null) {
+            return;
+        }
+        
+        mc.player.abilities.setFlySpeed(speed / 10F);
+        mc.player.fallDistance = 0;
     }
 }

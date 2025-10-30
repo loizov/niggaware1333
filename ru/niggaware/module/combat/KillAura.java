@@ -1,51 +1,56 @@
 package ru.niggaware.module.combat;
 
+import ru.niggaware.NiggaWare;
+import ru.niggaware.EventTarget;
 import ru.niggaware.module.Module;
-import net.minecraft.client.Minecraft;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.Hand;
 import org.lwjgl.glfw.GLFW;
 
 public class KillAura extends Module {
-    
-    private double range = 4.2;
+    private float range = 4.2F;
+    private int delay = 100;
+    private long lastAttack = 0;
     
     public KillAura() {
-        super("KillAura", GLFW.GLFW_KEY_R, Category.COMBAT);
+        super("KillAura", Category.COMBAT);
+        setKey(GLFW.GLFW_KEY_R);
     }
     
     @Override
-    public void onUpdate() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) return;
-        
-        for (LivingEntity entity : mc.level.getEntitiesOfClass(LivingEntity.class, 
-            mc.player.getBoundingBox().inflate(range))) {
-            
-            if (entity != mc.player && entity.isAlive()) {
-                // Поворот к цели
-                float[] rotations = getRotations(entity);
-                mc.player.xRot = rotations[0];
-                mc.player.yRot = rotations[1];
-                
-                // Атака
-                mc.gameMode.attack(mc.player, entity);
-                mc.player.swing(mc.player.getUsedItemHand());
-                break;
-            }
-        }
+    public void onEnable() {
+        NiggaWare.INSTANCE.eventManager.register(this);
     }
     
-    private float[] getRotations(LivingEntity entity) {
-        Minecraft mc = Minecraft.getInstance();
-        double x = entity.getX() - mc.player.getX();
-        double y = entity.getY() + entity.getEyeHeight() - mc.player.getEyeY();
-        double z = entity.getZ() - mc.player.getZ();
+    @Override
+    public void onDisable() {
+        NiggaWare.INSTANCE.eventManager.unregister(this);
+    }
+    
+    @EventTarget
+    public void onUpdate(Object event) {
+        if (mc.player == null || mc.world == null) {
+            return;
+        }
         
-        double dist = Math.sqrt(x * x + z * z);
-        float yaw = (float) (Math.atan2(z, x) * 180.0 / Math.PI) - 90.0f;
-        float pitch = (float) (-(Math.atan2(y, dist) * 180.0 / Math.PI));
+        if (System.currentTimeMillis() - lastAttack < delay) {
+            return;
+        }
         
-        return new float[]{pitch, yaw};
+        for (Entity entity : mc.world.getAllEntities()) {
+            if (entity instanceof LivingEntity && entity != mc.player) {
+                double distance = mc.player.getDistance(entity);
+                if (distance <= range) {
+                    if (entity instanceof PlayerEntity) {
+                        mc.playerController.attackEntity(mc.player, entity);
+                        mc.player.swing(Hand.MAIN_HAND, true);
+                        lastAttack = System.currentTimeMillis();
+                        break;
+                    }
+                }
+            }
+        }
     }
 }

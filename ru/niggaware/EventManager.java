@@ -1,70 +1,62 @@
 package ru.niggaware;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.ArrayList;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Map;
 
 public class EventManager {
-    
-    private HashMap<Class<? extends Event>, List<MethodData>> eventMap;
-    
-    public EventManager() {
-        eventMap = new HashMap<>();
-    }
+    private final Map<Class<? extends Event>, List<MethodData>> eventMap = new HashMap<>();
     
     public void register(Object object) {
         for (Method method : object.getClass().getDeclaredMethods()) {
-            if (method.getParameterCount() == 1 && method.isAnnotationPresent(EventTarget.class)) {
+            if (method.isAnnotationPresent(EventTarget.class) && method.getParameterCount() == 1) {
                 Class<?> eventClass = method.getParameterTypes()[0];
                 
-                if (!eventMap.containsKey(eventClass)) {
-                    eventMap.put((Class<? extends Event>) eventClass, new CopyOnWriteArrayList<>());
+                if (!Event.class.isAssignableFrom(eventClass)) {
+                    continue;
                 }
                 
-                eventMap.get(eventClass).add(new MethodData(object, method));
+                method.setAccessible(true);
+                
+                List<MethodData> methods = eventMap.computeIfAbsent(
+                    (Class<? extends Event>) eventClass,
+                    k -> new ArrayList<>()
+                );
+                
+                methods.add(new MethodData(object, method));
             }
         }
     }
     
     public void unregister(Object object) {
-        for (List<MethodData> dataList : eventMap.values()) {
-            dataList.removeIf(data -> data.getSource() == object);
-        }
+        eventMap.values().forEach(methods -> methods.removeIf(data -> data.source == object));
     }
     
-    public Event call(Event event) {
-        List<MethodData> dataList = eventMap.get(event.getClass());
+    public void call(Event event) {
+        List<MethodData> methods = eventMap.get(event.getClass());
         
-        if (dataList != null) {
-            for (MethodData data : dataList) {
-                try {
-                    data.getMethod().invoke(data.getSource(), event);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
+        if (methods == null) {
+            return;
         }
         
-        return event;
+        for (MethodData data : methods) {
+            try {
+                data.method.invoke(data.source, event);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
     
     private static class MethodData {
-        private Object source;
-        private Method method;
+        private final Object source;
+        private final Method method;
         
         public MethodData(Object source, Method method) {
             this.source = source;
             this.method = method;
-        }
-        
-        public Object getSource() {
-            return source;
-        }
-        
-        public Method getMethod() {
-            return method;
         }
     }
 }
